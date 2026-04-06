@@ -1,5 +1,91 @@
 # Changelog
 
+## [0.3.0] — 2026-04-07
+
+### 개요
+상호작용 시스템 대폭 강화, 감정 표현 개선, 말풍선 고도화, 다수의 상태 머신 버그 수정.
+
+### Stack A — Electron Main (`src/main/`)
+
+**movement.ts** (변경)
+- `sleeping` 모드 추가 (6초, 180프레임)
+- `enterIdle()` 순서 수정: mode='idle' 먼저 설정 후 sadChance 체크 — landing→idle 전환 시 멈춤 버그 해결
+- `enterFalling()`: 이미 바닥에 있으면 즉시 landing으로 전환 — 드래그 해제 후 멈춤 버그 해결
+- `enterSad()` 재진입 가드 제거 — sad 상태 무한 멈춤 버그 해결
+- petting/eating 종료 후 `enterHappy()` 전환 (기존: idle/walking 복귀)
+
+**ipc.ts** (변경)
+- 컨텍스트 메뉴 한글화 + "쓰다듬기" → "놀아주기" 변경
+- 밥 주기/놀아주기/씻기기 시 스탯 변경 IPC 추가 (`pet:do-feed`, `pet:do-play`, `pet:do-clean`)
+- 씻기기/놀아주기 시 happy 모션 트리거
+- 5초 글로벌 쿨타임 (쿨타임 중 메뉴 항목 비활성화 + "대기중" 표시)
+- interaction 타입에 `'sleeping'` 추가
+
+### Stack B — Renderer UI (`src/renderer/src/`)
+
+**Pet.tsx** (변경)
+- falling 애니메이션: `infinite` → `1 forwards` (한 번만 재생)
+- `NON_LOOPING_MODES`에 `'falling'` 추가
+- happy 모드 `scale(1.15)` 보정 (스프라이트 크기 차이 보완)
+- sleeping 스프라이트: 1번 프레임 제외 (2~6번만 재생, `backgroundPosition: -64px 0`)
+- 드래그 중 흔들기 감지 → BinaryParticles에 shakeCount 전달
+- 우클릭 시 말풍선/상태창 숨김 (menuOpen 상태)
+- 상태창 위치: 말풍선 표시 중이면 위로 이동 (bottom: 105), 없으면 기존 위치 (bottom: 68)
+- 상태창 위치 전환 `transition: bottom 0.25s ease`
+- "배고픔" 라벨 → "배부름" 변경
+- 쓰다듬기 쿨타임 10초, 행복도 +1
+- feed/play/clean IPC 리스너 + 상호작용 말풍선 트리거
+
+**BinaryParticles.tsx** (변경)
+- 드래그 시작이 아닌 흔들기(shakeCount)로 파티클 낙하 트리거
+- 떨어지는 파티클을 별도 `dropParticles` 배열로 분리
+- 스프라이트 영역(bottom: 55~65)에서 아래로 낙하하는 `binary-drop` 애니메이션
+
+**SpeechBubble.tsx** (변경)
+- 대사 120개로 확장 (기존 78개)
+- 상태 기반 필터링: 긍정 대사는 평균 스탯 40~60 이상, 부정 대사는 낮을 때만
+- `pickLine()` 단순화: 조건 통과한 전체 대사에서 가중치 선택
+- 상호작용 말풍선: 밥 "냠냠", 놀아주기 "헤헤", 씻기기 "뽀득"
+- 상호작용 말풍선은 일반 말풍선보다 우선 (기존 타이머 취소 후 즉시 표시)
+- `busyRef`로 말풍선 표시 중 중복 방지
+- sleep 태그 대사 → sleeping 모션 트리거
+
+**index.css** (변경)
+- `sprite-sleep` 키프레임: 1번 프레임 스킵 (`from: -64px 0`)
+- `binary-drop` 키프레임 추가
+- `squash` 키프레임 (기존)
+
+### Stack C — State Engine
+
+**petStore.ts** (변경)
+- `feed()`: hunger +15 → +10
+- `pet()`: happiness +10 → +1 (쓰다듬기 너프)
+- `play()` 신규: happiness +10, exp +5 (놀아주기)
+- `clean()`: cleanliness +20 → +10
+- 행복도 간접 감소: 배고픔/청결 50이하 시 느린 감소, 30이하 시 빠른 감소
+- `getMoodModifier()`: sadChance 추가 (평균 ≤20 → 1.0, ≤40 → 0.5)
+- `applyOfflineDecay()`: 동일 행복도 감소 로직 적용
+
+### Preload
+- `onFeed`, `onPlay`, `onClean` API 추가
+- `triggerInteraction` 타입에 `'sleeping'` 추가
+
+### 버그 수정
+- landing→idle 전환 시 모션 멈춤 (enterIdle에서 mode 미설정)
+- 드래그 해제 후 모션 멈춤 (바닥에서 falling 상태 유지)
+- sad 상태 무한 멈춤 (재진입 가드 문제)
+- 상태창 드래그 후 유지 (didDrag 시 setShowStats(false))
+- 컨텍스트 메뉴 외부 클릭 시 미닫힘 (setIgnoreMouseEvents 토글)
+- 밥 주기 시 스탯 미반영 (feed IPC 누락)
+
+### 에셋
+- `chr_sleepy.png` 추가 (6프레임 수면 스프라이트)
+
+### 기타
+- `.gitignore`에 `.claude/`, `coverage/` 추가
+
+---
+
 ## [0.2.0] — 2026-04-07
 
 ### 개요

@@ -20,6 +20,7 @@ type Mode =
   | 'eating'
   | 'sad'
   | 'happy'
+  | 'sleeping'
 type Direction = 'left' | 'right'
 
 const FRAME_INTERVAL = 1000 / 30
@@ -31,6 +32,7 @@ const PETTING_FRAMES = 36 // 1.2s at 30fps — CSS 애니메이션과 일치
 const EATING_FRAMES = 72
 const SAD_FRAMES = 120    // 4초
 const HAPPY_FRAMES = 90   // 3초
+const SLEEPING_FRAMES = 180 // 6초
 
 export function startMovementEngine(win: BrowserWindow): void {
   // 전체 모니터 결합 X 경계 계산
@@ -72,7 +74,7 @@ export function startMovementEngine(win: BrowserWindow): void {
   let preInteractionMode: 'idle' | 'walking' = 'idle'
 
   // mood modifier (렌더러에서 주기적으로 갱신)
-  let mood: MoodModifier = { speedMultiplier: 1, jumpChance: 0.15, idleMultiplier: 1 }
+  let mood: MoodModifier = { speedMultiplier: 1, jumpChance: 0.15, idleMultiplier: 1, sadChance: 0 }
 
   function randomInt(min: number, max: number): number {
     return Math.floor(Math.random() * (max - min + 1)) + min
@@ -82,6 +84,16 @@ export function startMovementEngine(win: BrowserWindow): void {
     mode = 'idle'
     const base = randomInt(60, 240)
     stateTimer = Math.round(base * mood.idleMultiplier)
+
+    // sadChance=1 → 항상 슬픔, 0.5 → 50% 확률로 슬픔
+    if (mood.sadChance >= 1) {
+      enterSad()
+      return
+    }
+    if (mood.sadChance > 0 && Math.random() < mood.sadChance) {
+      enterSad()
+      return
+    }
   }
 
   function enterWalking(): void {
@@ -115,8 +127,14 @@ export function startMovementEngine(win: BrowserWindow): void {
     x = pos[0]
     y = pos[1]
     vy = 0
-    mode = 'falling'
     recalcDisplay()
+    // 이미 바닥이거나 아래에 있으면 바로 착지
+    if (y >= anchorY) {
+      y = anchorY
+      enterLanding()
+      return
+    }
+    mode = 'falling'
   }
 
   function enterLanding(): void {
@@ -141,16 +159,20 @@ export function startMovementEngine(win: BrowserWindow): void {
 
   function enterSad(): void {
     if (mode === 'dragging' || mode === 'falling' || mode === 'landing') return
-    if (mode === 'sad') return
     mode = 'sad'
     stateTimer = SAD_FRAMES
   }
 
   function enterHappy(): void {
     if (mode === 'dragging' || mode === 'falling' || mode === 'landing') return
-    if (mode === 'happy') return
     mode = 'happy'
     stateTimer = HAPPY_FRAMES
+  }
+
+  function enterSleeping(): void {
+    if (mode === 'dragging' || mode === 'falling' || mode === 'landing') return
+    mode = 'sleeping'
+    stateTimer = SLEEPING_FRAMES
   }
 
   function clampX(): void {
@@ -258,22 +280,20 @@ export function startMovementEngine(win: BrowserWindow): void {
       case 'petting': {
         y = anchorY
         stateTimer--
-        if (stateTimer <= 0) {
-          if (preInteractionMode === 'walking') enterWalking()
-          else enterIdle()
-        }
+        if (stateTimer <= 0) enterHappy()
         break
       }
 
       case 'eating': {
         y = anchorY
         stateTimer--
-        if (stateTimer <= 0) enterIdle()
+        if (stateTimer <= 0) enterHappy()
         break
       }
 
       case 'sad':
-      case 'happy': {
+      case 'happy':
+      case 'sleeping': {
         y = anchorY
         stateTimer--
         if (stateTimer <= 0) enterIdle()
@@ -298,11 +318,15 @@ export function startMovementEngine(win: BrowserWindow): void {
   setTriggerInteractionCallback((type) => {
     if (type === 'petting') enterPetting()
     else if (type === 'eating') enterEating()
+    else if (type === 'sad') enterSad()
+    else if (type === 'happy') enterHappy()
+    else if (type === 'sleeping') enterSleeping()
   })
 
   setMoodModifierCallback((mod) => {
     mood = mod
-    if (mod.speedMultiplier <= 0.5 && mode === 'idle') enterSad()
+    // idle 상태에서 sadChance가 발생하면 즉시 슬픈 표정 전환
+    if (mod.sadChance > 0 && mode === 'idle') enterIdle()
   })
 
   const timer = setInterval(tick, FRAME_INTERVAL)

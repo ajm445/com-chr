@@ -9,6 +9,7 @@ export type MovementMode =
   | 'eating'
   | 'sad'
   | 'happy'
+  | 'sleeping'
 export type Direction = 'left' | 'right'
 
 export interface MovementData {
@@ -33,6 +34,7 @@ export interface MoodModifier {
   speedMultiplier: number
   jumpChance: number
   idleMultiplier: number
+  sadChance: number  // 0=없음, 0~1=확률, 1=항상 슬픔
 }
 
 // 레벨 N에 필요한 누적 EXP = 15 * N * (N+1)

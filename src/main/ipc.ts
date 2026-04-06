@@ -15,6 +15,7 @@ export interface MovementData {
     | 'eating'
     | 'sad'
     | 'happy'
+    | 'sleeping'
   direction: 'left' | 'right'
 }
 
@@ -22,20 +23,21 @@ export interface MoodModifier {
   speedMultiplier: number
   jumpChance: number
   idleMultiplier: number
+  sadChance: number
 }
 
 let forceJumpCallback: (() => void) | null = null
 let dragStartCallback: (() => void) | null = null
 let dragMoveCallback: ((dx: number, dy: number) => void) | null = null
 let dragEndCallback: (() => void) | null = null
-let triggerInteractionCallback: ((type: 'petting' | 'eating') => void) | null = null
+let triggerInteractionCallback: ((type: 'petting' | 'eating' | 'sad' | 'happy' | 'sleeping') => void) | null = null
 let moodModifierCallback: ((mod: MoodModifier) => void) | null = null
 
 export function setForceJumpCallback(cb: () => void): void { forceJumpCallback = cb }
 export function setDragStartCallback(cb: () => void): void { dragStartCallback = cb }
 export function setDragMoveCallback(cb: (dx: number, dy: number) => void): void { dragMoveCallback = cb }
 export function setDragEndCallback(cb: () => void): void { dragEndCallback = cb }
-export function setTriggerInteractionCallback(cb: (type: 'petting' | 'eating') => void): void { triggerInteractionCallback = cb }
+export function setTriggerInteractionCallback(cb: (type: 'petting' | 'eating' | 'sad' | 'happy') => void): void { triggerInteractionCallback = cb }
 export function setMoodModifierCallback(cb: (mod: MoodModifier) => void): void { moodModifierCallback = cb }
 
 export function registerIPC(): void {
@@ -43,7 +45,7 @@ export function registerIPC(): void {
   ipcMain.on('pet:drag-start', () => dragStartCallback?.())
   ipcMain.on('pet:drag-move', (_e, data: { dx: number; dy: number }) => dragMoveCallback?.(data.dx, data.dy))
   ipcMain.on('pet:drag-end', () => dragEndCallback?.())
-  ipcMain.on('pet:interaction', (_e, payload: { type: 'petting' | 'eating' }) => triggerInteractionCallback?.(payload.type))
+  ipcMain.on('pet:interaction', (_e, payload: { type: 'petting' | 'eating' | 'sad' | 'happy' }) => triggerInteractionCallback?.(payload.type))
 
   // 상태 저장/로드
   ipcMain.on('pet:save-state', (_e, state) => savePetState(state))
@@ -52,20 +54,47 @@ export function registerIPC(): void {
   // mood modifier 수신
   ipcMain.on('pet:mood-modifier', (_e, mod: MoodModifier) => moodModifierCallback?.(mod))
 
+  let lastMenuActionTime = 0
+  const MENU_COOLDOWN = 5000
+
   ipcMain.on('pet:context-menu', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return
+
+    const now = Date.now()
+    const onCooldown = now - lastMenuActionTime < MENU_COOLDOWN
+
+    // 메뉴가 열리는 동안 클릭 통과 해제 (투명 영역 클릭으로 메뉴 닫기 가능)
+    win.setIgnoreMouseEvents(false)
+
     const menu = Menu.buildFromTemplate([
-      { label: 'Feed', click: () => triggerInteractionCallback?.('eating') },
-      { label: 'Pet', click: () => triggerInteractionCallback?.('petting') },
-      { label: 'Clean', click: () => {
-        // clean은 renderer의 store action이므로 IPC로 전달
+      { label: onCooldown ? '밥 주기 (대기중)' : '밥 주기', enabled: !onCooldown, click: () => {
+        lastMenuActionTime = Date.now()
+        win.webContents.send('pet:do-feed')
+        triggerInteractionCallback?.('eating')
+      }},
+      { label: onCooldown ? '놀아주기 (대기중)' : '놀아주기', enabled: !onCooldown, click: () => {
+        lastMenuActionTime = Date.now()
+        win.webContents.send('pet:do-play')
+        triggerInteractionCallback?.('happy')
+      }},
+      { label: onCooldown ? '씻기기 (대기중)' : '씻기기', enabled: !onCooldown, click: () => {
+        lastMenuActionTime = Date.now()
         win.webContents.send('pet:do-clean')
+        triggerInteractionCallback?.('happy')
       }},
       { type: 'separator' },
-      { label: 'Quit', click: () => app.quit() },
+      { label: '종료', click: () => app.quit() },
     ])
-    menu.popup({ window: win })
+    menu.popup({
+      window: win,
+      callback: () => {
+        // 메뉴 닫힌 후 클릭 통과 복원
+        if (!win.isDestroyed()) {
+          win.setIgnoreMouseEvents(true, { forward: true })
+        }
+      },
+    })
   })
 
   ipcMain.on('pet:quit', () => app.quit())

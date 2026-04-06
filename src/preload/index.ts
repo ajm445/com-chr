@@ -17,6 +17,14 @@ contextBridge.exposeInMainWorld('api', {
   sendMoodModifier: (mod: any) => { ipcRenderer.send('pet:mood-modifier', mod) },
   setClickThrough: (ignore: boolean) => { ipcRenderer.send('pet:click-through', ignore) },
   expandWindow: (expanded: boolean) => { ipcRenderer.send('pet:expand-window', expanded) },
+  onFeed: (callback: () => void) => {
+    ipcRenderer.on('pet:do-feed', () => callback())
+    return () => { ipcRenderer.removeAllListeners('pet:do-feed') }
+  },
+  onPlay: (callback: () => void) => {
+    ipcRenderer.on('pet:do-play', () => callback())
+    return () => { ipcRenderer.removeAllListeners('pet:do-play') }
+  },
   onClean: (callback: () => void) => {
     ipcRenderer.on('pet:do-clean', () => callback())
     return () => { ipcRenderer.removeAllListeners('pet:do-clean') }
