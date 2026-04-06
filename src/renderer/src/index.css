@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 128px;
+  height: 256px;
+  background: transparent;
+  overflow: hidden;
+}
+
+@keyframes sprite-idle {
+  to { background-position: -256px 0; }
+}
+
+@keyframes sprite-jump {
+  to { background-position: -384px 0; }
+}
+
+@keyframes sprite-grab {
+  to { background-position: -128px 0; }
+}
+
+@keyframes sprite-fall {
+  to { background-position: -192px 0; }
+}
+
+@keyframes sprite-land {
+  to { background-position: -256px 0; }
+}
+
+@keyframes sprite-pet {
+  to { background-position: -256px 0; }
+}
+
+@keyframes sprite-eat {
+  to { background-position: -320px 0; }
+}
+
+@keyframes sprite-sad {
+  to { background-position: -256px 0; }
+}
+
+@keyframes sprite-happy {
+  to { background-position: -256px 0; }
+}
+
+@keyframes squash {
+  0%   { transform: scaleX(1) scaleY(1); }
+  20%  { transform: scaleX(1.2) scaleY(0.8); }
+  50%  { transform: scaleX(0.9) scaleY(1.1); }
+  75%  { transform: scaleX(1.05) scaleY(0.95); }
+  100% { transform: scaleX(1) scaleY(1); }
+}
