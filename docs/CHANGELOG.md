@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.8] — 2026-04-08
+
+### Fixed
+- 1.0.7 에서도 일부 Windows 환경에서 슬라임이 작업표시줄에 가려져 "땅으로 꺼지는" 문제 재수정. 이전 로직은 `workArea`와 `bounds`가 **정확히 동일**할 때만 48px 여유를 적용했는데, Windows 가 작업표시줄 reservation 을 부분적으로만 보고하거나 1~2px 오차가 있는 환경에서는 발동하지 않았음.
+- `getEffectiveAnchorY()` 를 "workArea 기준 anchor"와 "display bounds 바닥에서 48px 떨어진 절대 안전선" 중 **더 위쪽** 을 선택하도록 변경. 이로써 어떤 보고 값이 들어와도 스프라이트 바닥이 display bounds 바닥에서 최소 48px 이상 떨어지는 것이 보장된다.
+
 ## [1.0.7] — 2026-04-08
 
 ### Fixed
