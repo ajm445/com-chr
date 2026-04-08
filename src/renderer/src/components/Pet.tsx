@@ -81,7 +81,8 @@ function Pet() {
 
   // 상태 바 (hover)
   const [showStats, setShowStats] = useState(false)
-  const [bubbleVisible, setBubbleVisible] = useState(false)
+  // 현재 화면에 떠 있는 말풍선 개수 (0/1/2) — 상태 바가 그 위로 쌓이도록 위치 계산에 사용
+  const [bubbleCount, setBubbleCount] = useState(0)
 
   // hover 진입 시 인터랙티브
   const handleSpriteEnter = useCallback(() => {
@@ -229,7 +230,7 @@ function Pet() {
       {/* 말풍선 */}
       <SpeechBubble
         hide={menuOpen}
-        onVisibleChange={setBubbleVisible}
+        onBubbleCountChange={setBubbleCount}
         interactionText={interactionText}
         onInteractionDone={() => setInteractionText(null)}
       />
@@ -253,7 +254,8 @@ function Pet() {
         {showStats && !menuOpen && (
           <div style={{
             position: 'absolute',
-            bottom: bubbleVisible ? 105 : 68,
+            // 말풍선 0/1/2개가 아래 쌓여 있으면 상태 바는 그 위로 올라간다.
+            bottom: 68 + bubbleCount * 37,
             left: '50%',
             transform: 'translateX(-50%)',
             width: 140,
