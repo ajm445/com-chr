@@ -7,27 +7,29 @@ export const WINDOW_HEIGHT = 256 // 고정 높이: 스프라이트(64) + 점프/
 export const SPRITE_SIZE = 64
 
 /**
- * 자동 숨김 작업표시줄·기타 환경에서 슬라임이 가려지지 않도록 화면 바닥에서 확보하는 여유 픽셀.
- * 일반 작업표시줄은 일반적으로 40~48px. 48이면 99% 환경에서 가려지지 않는다.
+ * 화면 바닥에서 슬라임 스프라이트 바닥까지 **절대** 확보해야 하는 최소 여유 픽셀.
+ * Windows 11 기본 작업표시줄이 약 48px 이므로, 작업표시줄이 어떤 이유로든
+ * workArea 에 반영되지 않아도 이 값만큼 띄우면 가려지지 않는다.
  */
-export const TASKBAR_AUTOHIDE_RESERVE = 48
+export const MIN_BOTTOM_SAFE_MARGIN = 48
 
 /**
  * 디스플레이의 "유효 anchorY" — 슬라임의 윈도우 top 이 위치해야 하는 Y 좌표.
  *
- * 핵심: workArea 가 bounds 와 동일하면 (예: 자동 숨김 작업표시줄, 풀스크린 모드 등으로
- * Windows 가 작업표시줄 공간을 reservation 하지 않은 상태) 슬라임이 화면 바닥에 붙어
- * 작업표시줄에 가려지므로, 안전 여유를 둔다.
+ * 두 기준 중 더 **위쪽(=작은 y)** 을 선택한다:
+ *   1. workArea 기준 바닥 (일반 작업표시줄이 정상 reservation 된 경우 이 값이 정답)
+ *   2. display bounds 기준 바닥 − MIN_BOTTOM_SAFE_MARGIN (절대 안전선)
+ *
+ * 이렇게 하면:
+ * - 정상 환경: workArea 기준 == 안전선 → 동일, 작업표시줄 바로 위에 안착
+ * - 자동 숨김 작업표시줄 / 풀스크린 보호: workArea==bounds → 안전선이 더 위 → 56px 여유
+ * - 부분 reservation 버그(일부 Windows 11 설정): workArea 가 살짝만 줄어도 안전선이 더 위로 올라가 확실히 가려지지 않음
  */
 export function getEffectiveAnchorY(display: Display): number {
   const { workArea, bounds } = display
-  const noReservation =
-    workArea.x === bounds.x &&
-    workArea.y === bounds.y &&
-    workArea.width === bounds.width &&
-    workArea.height === bounds.height
-  const reserve = noReservation ? TASKBAR_AUTOHIDE_RESERVE : 0
-  return workArea.y + workArea.height - WINDOW_HEIGHT - reserve
+  const workAreaAnchor = workArea.y + workArea.height - WINDOW_HEIGHT
+  const safeAnchor = bounds.y + bounds.height - WINDOW_HEIGHT - MIN_BOTTOM_SAFE_MARGIN
+  return Math.min(workAreaAnchor, safeAnchor)
 }
 
 export function createWindow(): BrowserWindow {
