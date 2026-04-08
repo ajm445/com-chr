@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.4] — 2026-04-08
+
+### Fixed
+- 슬라임을 우클릭해 컨텍스트 메뉴를 열 때 창이 작업표시줄에 잠깐 나타났다가 메뉴를 닫으면 사라지던 깜빡임 현상 수정. Windows에서 `setFocusable(true)` 호출 시 `skipTaskbar` 플래그가 해제되는 문제를 `setSkipTaskbar(true)`를 즉시 재적용하는 방식으로 우회.
+
 ## [1.0.3] — 2026-04-08
 
 ### Fixed

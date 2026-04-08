@@ -68,6 +68,8 @@ export function registerIPC(): void {
     win.setIgnoreMouseEvents(false)
     // 외부 클릭으로 메뉴가 닫히도록 임시로 focusable 활성화
     win.setFocusable(true)
+    // Windows: setFocusable(true)는 skipTaskbar를 해제하므로 즉시 재적용
+    win.setSkipTaskbar(true)
     win.focus()
 
     const menu = Menu.buildFromTemplate([
@@ -95,6 +97,7 @@ export function registerIPC(): void {
         // 메뉴 닫힌 후 클릭 통과 + 비포커스 상태 복원
         if (!win.isDestroyed()) {
           win.setFocusable(false)
+          win.setSkipTaskbar(true)
           win.setIgnoreMouseEvents(true, { forward: true })
         }
       },
