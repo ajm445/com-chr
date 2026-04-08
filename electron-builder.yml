@@ -1,5 +1,5 @@
-appId: com.electron.com-chr
-productName: com-chr
+appId: com.ajm445.slime-pet
+productName: 슬라임 펫
 directories:
   buildResources: build
 files:
@@ -8,18 +8,22 @@ files:
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!scripts/**'
 asarUnpack:
   - resources/**
   - '**/node_modules/electron-updater/**'
 win:
-  executableName: com-chr
+  executableName: SlimePet
+  icon: build/icon.ico
   target:
     - nsis
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
-  shortcutName: ${productName}
-  uninstallDisplayName: ${productName}
+  artifactName: SlimePet-${version}-setup.${ext}
+  shortcutName: 슬라임 펫
+  uninstallDisplayName: 슬라임 펫
   createDesktopShortcut: always
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
 publish:
   provider: github
   owner: ajm445

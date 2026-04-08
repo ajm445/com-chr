@@ -1,5 +1,112 @@
 # Changelog
 
+## [1.0.1] — 2026-04-08
+
+### 개요
+앱 정식 릴리스. 자동 업데이트 시스템, 레벨업 이펙트, 앱 브랜딩(이름·아이콘) 정비.
+컨텍스트 메뉴 외부 클릭 닫기 버그 수정.
+
+### Stack A — Electron Main (`src/main/`)
+
+**updater.ts** (신규)
+- `electron-updater` 기반 GitHub Releases 자동 업데이트
+- 앱 시작 시 1회 체크 + 4시간 주기 재체크
+- 다운로드 완료 시 사용자에게 재시작 다이얼로그 표시
+- `autoInstallOnAppQuit`: 거절 시 다음 종료 때 자동 설치
+- `app.isPackaged`일 때만 동작 (dev 환경 영향 없음)
+
+**index.ts** (변경)
+- `initAutoUpdater()` 호출 추가
+- `setAppUserModelId`: `com.electron.com-chr` → `com.ajm445.slime-pet`
+
+**ipc.ts** (변경)
+- 컨텍스트 메뉴 표시 시 `setFocusable(true)` + `focus()` 호출 → 외부 클릭으로 메뉴 자동 닫기 수정
+- 메뉴 콜백에서 `setFocusable(false)` 복원
+
+**tray.ts** (변경)
+- 트레이 아이콘 소스를 `resources/tray.png`(슬라임 idle 1프레임 32×32)로 교체
+- 강제 16×16 리사이즈 제거 (찌그러짐 해소)
+- `setToolTip('슬라임 펫')` 추가
+
+### Stack B — Renderer UI (`src/renderer/src/`)
+
+**LevelUpEffect.tsx** (신규)
+- 레벨업 시 1.8초 일회성 이펙트
+- 보라/마젠타 홀로그래픽 링 2겹 확장
+- 10개 방사형 파티클
+- "LEVEL UP ▲ Lv.N" 텍스트 글로우
+- `useRef`로 prev level 추적, 다중 레벨업 동시 처리 가능
+
+**Pet.tsx** (변경)
+- `<LevelUpEffect />` 마운트
+
+**index.css** (변경)
+- `levelup-ring`, `levelup-particle`, `levelup-text` 키프레임 추가
+
+### 빌드 / 배포
+
+**electron-builder.yml**
+- `productName`: `com-chr` → `슬라임 펫`
+- `appId`: `com.electron.com-chr` → `com.ajm445.slime-pet`
+- `win.executableName`: `SlimePet`
+- `win.icon`, `nsis.installerIcon`, `nsis.uninstallerIcon`: `build/icon.ico`
+- `nsis.artifactName`: `SlimePet-${version}-setup.${ext}`
+- `publish`: GitHub Releases (`ajm445/com-chr`)
+- `asarUnpack`: `electron-updater` 모듈 unpacked
+- `files`: `scripts/` 제외
+
+**아이콘**
+- `chr_idle.png` 1번 프레임(64×64) → nearest-neighbor 업스케일로 픽셀 보존
+- `build/icon.ico` (16/32/48/64/128/256 멀티사이즈)
+- `build/icon.png` (256×256), `resources/icon.png` (512×512), `resources/tray.png` (32×32)
+
+**scripts/generate-icons.mjs** (신규)
+- `sharp` + `png-to-ico`로 아이콘 자동 생성 스크립트
+
+**package.json**
+- `electron-updater` 의존성 추가
+- `png-to-ico` devDep 추가
+- `release` 스크립트: `pnpm build && electron-builder --win --publish always`
+- 버전 `1.0.0` → `1.0.1`
+
+**dev-app-update.yml** (신규)
+- dev 환경 업데이트 테스트용 설정
+
+### 개발 도구
+
+**.claude/commands/release.md** (신규)
+- `/release [patch|minor|major]` 슬래시 명령어
+- develop 브랜치 시작 → main 머지 → 버전 bump → 빌드 → GitHub publish → develop 동기화 자동화
+
+### 버그 수정
+- 컨텍스트 메뉴 외부 화면 클릭 시 미닫힘 (focusable 문제)
+- 트레이 아이콘 찌그러짐 (1003×249 배너 이미지 강제 리사이즈)
+
+### ⚠️ 호환성 주의
+- `appId` 변경으로 기존 v0.x 설치본은 자동 업데이트 대상이 아님
+- 기존 앱 제거 후 새 `SlimePet-1.0.1-setup.exe` 수동 설치 필요
+- 이후 v1.0.2부터는 정상 자동 업데이트
+
+---
+
+## [0.3.1] — 2026-04-08 (미릴리스)
+
+### 개요
+레벨별 대사 해금 시스템 — 슬라임이 성장할수록 말문이 트임.
+
+### Stack B — Renderer UI
+
+**SpeechBubble.tsx** (변경)
+- 각 대사에 `minLevel` 필드 추가
+- Lv.1: 단순한 의성어/의태어만 ("...", "오?")
+- Lv.3+: 짧은 단어
+- Lv.5+: 짧은 문장
+- Lv.7+: 감정 표현
+- Lv.10: 풀 어휘 해금
+- 현재 레벨 미만 대사는 후보에서 제외
+
+---
+
 ## [0.3.0] — 2026-04-07
 
 ### 개요
