@@ -10,12 +10,14 @@
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "pnpm build && electron-builder --dir",
     "build:win": "pnpm build && electron-builder --win",
+    "release": "pnpm build && electron-builder --win --publish always",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch"
   },
   "dependencies": {
     "electron-store": "^8.2.0",
+    "electron-updater": "^6.8.3",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

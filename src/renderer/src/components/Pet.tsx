@@ -5,6 +5,7 @@ import { useStateTick } from '../engine/stateTick'
 import { BinaryParticles } from './BinaryParticles'
 import { DirtOverlay } from './DirtOverlay'
 import { SpeechBubble } from './SpeechBubble'
+import { LevelUpEffect } from './LevelUpEffect'
 import type { MovementMode } from '../types/pet'
 
 import idleSprite  from '../assets/sprites/chr_idle.png'
@@ -301,6 +302,9 @@ function Pet() {
 
       {/* 이진수 분비물 */}
       <BinaryParticles cleanliness={cleanliness} shakeCount={shakeCount} />
+
+      {/* 레벨업 이펙트 */}
+      <LevelUpEffect level={level} />
     </>
   )
 }

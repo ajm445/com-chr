@@ -77,6 +77,26 @@ html, body, #root {
   100% { transform: translateY(60px); opacity: 0; }
 }
 
+@keyframes levelup-ring {
+  0%   { transform: scale(0.3); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+@keyframes levelup-particle {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  80%  { opacity: 0.8; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; }
+}
+
+@keyframes levelup-text {
+  0%   { transform: translateX(-50%) translateY(6px) scale(0.6); opacity: 0; }
+  20%  { transform: translateX(-50%) translateY(-2px) scale(1.15); opacity: 1; }
+  35%  { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+  75%  { transform: translateX(-50%) translateY(-4px) scale(1); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(-14px) scale(0.95); opacity: 0; }
+}
+
 @keyframes squash {
   0%   { transform: scaleX(1) scaleY(1); }
   20%  { transform: scaleX(1.2) scaleY(0.8); }
