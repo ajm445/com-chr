@@ -146,22 +146,22 @@ describe('petStore tick — EXP 및 레벨업', () => {
 // feed
 // ─────────────────────────────────────────────
 describe('petStore feed — 스탯 및 EXP 증가', () => {
-  it('hunger가 15 증가한다', () => {
+  it('hunger가 10 증가한다', () => {
     usePetStore.setState({ hunger: 50 })
     usePetStore.getState().feed()
-    expect(usePetStore.getState().hunger).toBe(65)
+    expect(usePetStore.getState().hunger).toBe(60)
   })
 
   it('hunger가 100을 초과하지 않는다 (clamp 상한)', () => {
-    usePetStore.setState({ hunger: 90 })
+    usePetStore.setState({ hunger: 95 })
     usePetStore.getState().feed()
     expect(usePetStore.getState().hunger).toBe(100)
   })
 
-  it('hunger가 0일 때 feed하면 15가 된다', () => {
+  it('hunger가 0일 때 feed하면 10이 된다', () => {
     usePetStore.setState({ hunger: 0 })
     usePetStore.getState().feed()
-    expect(usePetStore.getState().hunger).toBe(15)
+    expect(usePetStore.getState().hunger).toBe(10)
   })
 
   it('feed 시 EXP가 3 증가한다', () => {
@@ -189,14 +189,14 @@ describe('petStore feed — 스탯 및 EXP 증가', () => {
 // pet (쓰다듬기)
 // ─────────────────────────────────────────────
 describe('petStore pet — 스탯 및 EXP 증가', () => {
-  it('happiness가 10 증가한다', () => {
+  it('happiness가 1 증가한다 (소소한 쓰다듬기)', () => {
     usePetStore.setState({ happiness: 50 })
     usePetStore.getState().pet()
-    expect(usePetStore.getState().happiness).toBe(60)
+    expect(usePetStore.getState().happiness).toBe(51)
   })
 
   it('happiness가 100을 초과하지 않는다', () => {
-    usePetStore.setState({ happiness: 95 })
+    usePetStore.setState({ happiness: 100 })
     usePetStore.getState().pet()
     expect(usePetStore.getState().happiness).toBe(100)
   })
@@ -219,14 +219,14 @@ describe('petStore pet — 스탯 및 EXP 증가', () => {
 // clean
 // ─────────────────────────────────────────────
 describe('petStore clean — 스탯 및 EXP 증가', () => {
-  it('cleanliness가 20 증가한다', () => {
+  it('cleanliness가 10 증가한다', () => {
     usePetStore.setState({ cleanliness: 50 })
     usePetStore.getState().clean()
-    expect(usePetStore.getState().cleanliness).toBe(70)
+    expect(usePetStore.getState().cleanliness).toBe(60)
   })
 
   it('cleanliness가 100을 초과하지 않는다', () => {
-    usePetStore.setState({ cleanliness: 85 })
+    usePetStore.setState({ cleanliness: 95 })
     usePetStore.getState().clean()
     expect(usePetStore.getState().cleanliness).toBe(100)
   })
@@ -399,12 +399,13 @@ describe('petStore applyOfflineDecay — 오프라인 역산', () => {
     expect(usePetStore.getState().hunger).toBeCloseTo(expected)
   })
 
-  it('1시간 경과 후 happiness, cleanliness도 올바르게 감소한다', () => {
-    jest.setSystemTime(FIXED_TIME + 3_600_000)
+  it('5분 경과(30 ticks) 후 happiness, cleanliness도 순수 감쇄율대로 감소한다', () => {
+    // 5분 후: hunger=80-15=65, cleanliness=80-9=71 둘 다 50 초과 → happiness penalty 미적용
+    jest.setSystemTime(FIXED_TIME + 300_000) // +5분
     usePetStore.getState().applyOfflineDecay()
     const s = usePetStore.getState()
-    expect(s.happiness).toBeCloseTo(Math.max(0, 80 - 360 * DECAY_RATES.happiness))
-    expect(s.cleanliness).toBeCloseTo(Math.max(0, 80 - 360 * DECAY_RATES.cleanliness))
+    expect(s.happiness).toBeCloseTo(Math.max(0, 80 - 30 * DECAY_RATES.happiness))
+    expect(s.cleanliness).toBeCloseTo(Math.max(0, 80 - 30 * DECAY_RATES.cleanliness))
   })
 
   it('스탯이 0 아래로 내려가지 않는다 (24시간 오프라인)', () => {

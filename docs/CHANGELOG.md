@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.3] — 2026-04-08
+
+### Fixed
+- 작업표시줄·트레이·인스톨러 아이콘이 빈 투명 이미지로 보이던 문제 수정. `chr_idle` 스프라이트 첫 프레임을 잘라 `build/icon.{ico,png}`, `resources/icon.png`, `resources/tray.png`를 모두 재생성.
+
+### Added
+- `scripts/generate-icons.cjs` — `sharp` + `png-to-ico` 기반 아이콘 자동 생성 스크립트. 스프라이트가 갱신되면 한 번만 실행해 모든 아이콘 사이즈(16~512, ico 멀티사이즈 포함) 일괄 출력.
+
+### Internal
+- v0.3.0 스탯 밸런스 조정(`feed +10`, `pet +1`, `clean +10`)과 happiness penalty cascade 도입 이후 stale 상태로 남아 있던 `petStore` 단위 테스트 7건을 새 로직 기준으로 수정. 144건 전부 통과.
+
 ## [1.0.2] — 2026-04-08
 
 ### 개요
