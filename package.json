@@ -1,6 +1,6 @@
 {
   "name": "com-chr",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Digital pet desktop app - cybernetic slime on your taskbar",
   "main": "./out/main/index.js",
   "scripts": {
