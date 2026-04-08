@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.7] — 2026-04-08
+
+### Fixed
+- 멀티 모니터 추가·제거·해상도/DPI 변경 시 슬라임이 화면 밖으로 밀리거나 이상한 Y 좌표에 남아 있던 문제 수정. `display-added`/`display-removed`/`display-metrics-changed` 이벤트에서 bounds 재계산 및 안전 스냅.
+- 절전모드에서 복귀하거나 z-order 가 다른 창에 밀렸을 때 슬라임이 보이지 않던 문제 수정. `powerMonitor.on('resume')` 훅과 1초 주기 안전 검증(`ensureOnScreen`)에서 `moveTop()` 강제.
+- 작업표시줄 자동 숨김 모드 등 Windows 가 workArea 를 bounds 와 동일하게 잡는 환경에서 슬라임이 화면 바닥에 가려지던 문제 수정. `getEffectiveAnchorY()` 로 48px 여유를 확보.
+
+### Changed
+- `movement.ts` 좌표 계산을 공용 `displayAt()`/`getEffectiveAnchorY()` 헬퍼로 통일, `screen` API 실패 시 primary display 로 안전 fallback.
+
 ## [1.0.6] — 2026-04-08
 
 ### Fixed

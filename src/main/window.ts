@@ -1,4 +1,4 @@
-import { BrowserWindow, screen, ipcMain } from 'electron'
+import { BrowserWindow, screen, ipcMain, Display } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 
@@ -6,11 +6,36 @@ export const WINDOW_WIDTH = 160
 export const WINDOW_HEIGHT = 256 // 고정 높이: 스프라이트(64) + 점프/UI 공간(192)
 export const SPRITE_SIZE = 64
 
+/**
+ * 자동 숨김 작업표시줄·기타 환경에서 슬라임이 가려지지 않도록 화면 바닥에서 확보하는 여유 픽셀.
+ * 일반 작업표시줄은 일반적으로 40~48px. 48이면 99% 환경에서 가려지지 않는다.
+ */
+export const TASKBAR_AUTOHIDE_RESERVE = 48
+
+/**
+ * 디스플레이의 "유효 anchorY" — 슬라임의 윈도우 top 이 위치해야 하는 Y 좌표.
+ *
+ * 핵심: workArea 가 bounds 와 동일하면 (예: 자동 숨김 작업표시줄, 풀스크린 모드 등으로
+ * Windows 가 작업표시줄 공간을 reservation 하지 않은 상태) 슬라임이 화면 바닥에 붙어
+ * 작업표시줄에 가려지므로, 안전 여유를 둔다.
+ */
+export function getEffectiveAnchorY(display: Display): number {
+  const { workArea, bounds } = display
+  const noReservation =
+    workArea.x === bounds.x &&
+    workArea.y === bounds.y &&
+    workArea.width === bounds.width &&
+    workArea.height === bounds.height
+  const reserve = noReservation ? TASKBAR_AUTOHIDE_RESERVE : 0
+  return workArea.y + workArea.height - WINDOW_HEIGHT - reserve
+}
+
 export function createWindow(): BrowserWindow {
-  const { workArea } = screen.getPrimaryDisplay()
+  const display = screen.getPrimaryDisplay()
+  const { workArea } = display
 
   const x = Math.round(workArea.x + workArea.width / 2 - WINDOW_WIDTH / 2)
-  const y = workArea.y + workArea.height - WINDOW_HEIGHT
+  const y = getEffectiveAnchorY(display)
 
   const win = new BrowserWindow({
     width: WINDOW_WIDTH,
