@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.5] — 2026-04-08
+
+### Fixed
+- 앱이 종료되어 있던 시간 동안 hunger/happiness/cleanliness/EXP 가 소급 감소하던 문제 수정. 종료 중에는 모든 스탯이 완전히 동결되도록 변경(기존 "오프라인 역산" 로직 제거).
+
+### Changed
+- `applyOfflineDecay()` → `resumeFromBackground()` 으로 대체. 재시작 시 `lastTickTime` 만 현재 시각으로 갱신.
+- 더 이상 쓰이지 않는 `MAX_OFFLINE_TICKS` 상수 및 관련 테스트 제거.
+- `petStore` 오프라인 관련 테스트를 동결 동작 기준으로 재작성.
+
 ## [1.0.4] — 2026-04-08
 
 ### Fixed

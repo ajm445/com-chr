@@ -1,5 +1,5 @@
 /**
- * petStore.ts — tick/feed/pet/clean/getMoodModifier/applyOfflineDecay 검증
+ * petStore.ts — tick/feed/pet/clean/getMoodModifier/resumeFromBackground 검증
  *
  * Zustand store를 직접 import하면 persist 미들웨어가 localStorage를 찾아 터진다.
  * 해결책: localStorage와 zustand/middleware를 모킹한 후 store를 import한다.
@@ -14,7 +14,7 @@ jest.mock('zustand/middleware', () => ({
   persist: (storeCreator: (set: unknown, get: unknown) => unknown) => storeCreator,
 }))
 
-import { DECAY_RATES, TICK_INTERVAL, MAX_OFFLINE_TICKS, expForLevel } from '@renderer/types/pet'
+import { DECAY_RATES, TICK_INTERVAL, expForLevel } from '@renderer/types/pet'
 
 // persist 모킹 후 store import
 let usePetStore: typeof import('@renderer/store/petStore').usePetStore
@@ -376,98 +376,70 @@ describe('petStore getExpProgress', () => {
 })
 
 // ─────────────────────────────────────────────
-// applyOfflineDecay — 오프라인 역산
+// resumeFromBackground — 종료 중 스탯/EXP 동결
 // ─────────────────────────────────────────────
-describe('petStore applyOfflineDecay — 오프라인 역산', () => {
-  it('elapsed=0이면 스탯이 변하지 않는다', () => {
-    // reset() 후 lastTickTime=FIXED_TIME, 시간도 FIXED_TIME → elapsed=0
-    const before = usePetStore.getState().hunger
-    usePetStore.getState().applyOfflineDecay()
-    expect(usePetStore.getState().hunger).toBe(before)
-  })
-
-  it('1분 경과(6 ticks) 후 hunger가 정확히 6 * 0.5 = 3 감소한다', () => {
-    jest.setSystemTime(FIXED_TIME + 60_000) // +60초
-    usePetStore.getState().applyOfflineDecay()
-    expect(usePetStore.getState().hunger).toBeCloseTo(80 - 6 * DECAY_RATES.hunger)
-  })
-
-  it('1시간 경과(360 ticks) 후 hunger가 올바르게 감소한다', () => {
-    jest.setSystemTime(FIXED_TIME + 3_600_000) // +1시간
-    usePetStore.getState().applyOfflineDecay()
-    const expected = Math.max(0, 80 - 360 * DECAY_RATES.hunger)
-    expect(usePetStore.getState().hunger).toBeCloseTo(expected)
-  })
-
-  it('5분 경과(30 ticks) 후 happiness, cleanliness도 순수 감쇄율대로 감소한다', () => {
-    // 5분 후: hunger=80-15=65, cleanliness=80-9=71 둘 다 50 초과 → happiness penalty 미적용
-    jest.setSystemTime(FIXED_TIME + 300_000) // +5분
-    usePetStore.getState().applyOfflineDecay()
+describe('petStore resumeFromBackground — 종료 중 동결', () => {
+  it('경과 시간과 무관하게 hunger/happiness/cleanliness 가 변하지 않는다 (1분)', () => {
+    jest.setSystemTime(FIXED_TIME + 60_000)
+    usePetStore.getState().resumeFromBackground()
     const s = usePetStore.getState()
-    expect(s.happiness).toBeCloseTo(Math.max(0, 80 - 30 * DECAY_RATES.happiness))
-    expect(s.cleanliness).toBeCloseTo(Math.max(0, 80 - 30 * DECAY_RATES.cleanliness))
+    expect(s.hunger).toBe(80)
+    expect(s.happiness).toBe(80)
+    expect(s.cleanliness).toBe(80)
   })
 
-  it('스탯이 0 아래로 내려가지 않는다 (24시간 오프라인)', () => {
+  it('24시간이 지나도 스탯이 그대로 유지된다', () => {
     jest.setSystemTime(FIXED_TIME + 24 * 3_600_000)
-    usePetStore.getState().applyOfflineDecay()
+    usePetStore.getState().resumeFromBackground()
     const s = usePetStore.getState()
-    expect(s.hunger).toBeGreaterThanOrEqual(0)
-    expect(s.happiness).toBeGreaterThanOrEqual(0)
-    expect(s.cleanliness).toBeGreaterThanOrEqual(0)
+    expect(s.hunger).toBe(80)
+    expect(s.happiness).toBe(80)
+    expect(s.cleanliness).toBe(80)
   })
 
-  it('MAX_OFFLINE_TICKS 초과 시 8640 ticks로 상한이 걸린다 (30일 오프라인)', () => {
-    const thirtyDays = 30 * 24 * 3_600_000
-    jest.setSystemTime(FIXED_TIME + thirtyDays)
-    usePetStore.getState().applyOfflineDecay()
+  it('30일이 지나도 스탯이 그대로 유지된다', () => {
+    jest.setSystemTime(FIXED_TIME + 30 * 24 * 3_600_000)
+    usePetStore.getState().resumeFromBackground()
     const s = usePetStore.getState()
-    // 8640 ticks * 0.5 = 4320 감소 → 100에서 시작해도 0에 clamp
-    expect(s.hunger).toBeGreaterThanOrEqual(0)
-    expect(s.hunger).not.toBeNaN()
+    expect(s.hunger).toBe(80)
+    expect(s.happiness).toBe(80)
+    expect(s.cleanliness).toBe(80)
   })
 
-  it('시계가 과거로 돌아간 경우 (elapsed < 0) 스탯이 변하지 않는다', () => {
-    // lastTickTime이 미래에 있는 경우 시뮬레이션
-    usePetStore.setState({ lastTickTime: FIXED_TIME + 60_000 })
-    jest.setSystemTime(FIXED_TIME) // 현재가 lastTickTime보다 과거
-    const before = usePetStore.getState().hunger
-    usePetStore.getState().applyOfflineDecay()
-    expect(usePetStore.getState().hunger).toBe(before)
+  it('EXP/level 도 종료 중에는 변하지 않는다', () => {
+    usePetStore.setState({ exp: 42, level: 2 })
+    jest.setSystemTime(FIXED_TIME + TICK_INTERVAL * 100)
+    usePetStore.getState().resumeFromBackground()
+    const s = usePetStore.getState()
+    expect(s.exp).toBe(42)
+    expect(s.level).toBe(2)
   })
 
-  it('오프라인 후 lastTickTime이 현재 시각으로 업데이트된다', () => {
+  it('lastTickTime 은 현재 시각으로 밀린다', () => {
     const newTime = FIXED_TIME + 60_000
     jest.setSystemTime(newTime)
-    usePetStore.getState().applyOfflineDecay()
+    usePetStore.getState().resumeFromBackground()
     expect(usePetStore.getState().lastTickTime).toBe(newTime)
   })
 
-  it('오프라인 EXP는 스탯 평균이 높을 때 더 많이 쌓인다', () => {
-    // Case A: 높은 스탯 (avg >= 70) → multiplier 2.0
-    usePetStore.setState({ hunger: 80, happiness: 80, cleanliness: 80, exp: 0 })
-    jest.setSystemTime(FIXED_TIME + TICK_INTERVAL * 10) // 10 ticks
-    usePetStore.getState().applyOfflineDecay()
-    const highStatExp = usePetStore.getState().exp
-
-    // Case B: 낮은 스탯 (avg 20~39) → multiplier 0.3
-    usePetStore.getState().reset()
-    usePetStore.setState({ hunger: 30, happiness: 30, cleanliness: 30, exp: 0, lastTickTime: FIXED_TIME })
-    jest.setSystemTime(FIXED_TIME + TICK_INTERVAL * 10)
-    usePetStore.getState().applyOfflineDecay()
-    const lowStatExp = usePetStore.getState().exp
-
-    expect(highStatExp).toBeGreaterThan(lowStatExp)
+  it('시계가 과거로 돌아간 경우에도 스탯이 변하지 않는다', () => {
+    usePetStore.setState({ lastTickTime: FIXED_TIME + 60_000 })
+    jest.setSystemTime(FIXED_TIME)
+    usePetStore.getState().resumeFromBackground()
+    const s = usePetStore.getState()
+    expect(s.hunger).toBe(80)
+    expect(s.happiness).toBe(80)
+    expect(s.cleanliness).toBe(80)
   })
 
-  it('극단적으로 큰 elapsed 값도 NaN/Infinity를 생성하지 않는다', () => {
-    // Number.MAX_SAFE_INTEGER ms 경과 시뮬레이션
-    jest.setSystemTime(FIXED_TIME + Number.MAX_SAFE_INTEGER)
-    usePetStore.getState().applyOfflineDecay()
+  it('호출 후 즉시 tick 해도 한 tick 분량만 감소한다 (누적 오프라인 감쇠 없음)', () => {
+    // 24시간 뒤 재시작 → resume → 첫 tick
+    jest.setSystemTime(FIXED_TIME + 24 * 3_600_000)
+    usePetStore.getState().resumeFromBackground()
+    usePetStore.getState().tick()
     const s = usePetStore.getState()
-    expect(Number.isFinite(s.hunger)).toBe(true)
-    expect(Number.isFinite(s.happiness)).toBe(true)
-    expect(Number.isFinite(s.exp)).toBe(true)
+    expect(s.hunger).toBeCloseTo(80 - DECAY_RATES.hunger)
+    expect(s.cleanliness).toBeCloseTo(80 - DECAY_RATES.cleanliness)
   })
 })
 

@@ -6,16 +6,16 @@ const SAVE_INTERVAL = 30_000 // 30초마다 메인 프로세스에 백업
 
 export function useStateTick() {
   const tick = usePetStore((s) => s.tick)
-  const applyOfflineDecay = usePetStore((s) => s.applyOfflineDecay)
-  const hasAppliedOffline = useRef(false)
+  const resumeFromBackground = usePetStore((s) => s.resumeFromBackground)
+  const hasResumed = useRef(false)
 
-  // 시작 시 오프라인 역산 1회 적용
+  // 시작 시 lastTickTime 만 현재 시각으로 리셋 (종료 중 스탯 동결)
   useEffect(() => {
-    if (!hasAppliedOffline.current) {
-      applyOfflineDecay()
-      hasAppliedOffline.current = true
+    if (!hasResumed.current) {
+      resumeFromBackground()
+      hasResumed.current = true
     }
-  }, [applyOfflineDecay])
+  }, [resumeFromBackground])
 
   // 10초 간격 tick
   useEffect(() => {
