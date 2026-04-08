@@ -1,4 +1,4 @@
-import { BrowserWindow, screen } from 'electron'
+import { BrowserWindow, screen, powerMonitor, type Display } from 'electron'
 import {
   sendMovementUpdate,
   setForceJumpCallback,
@@ -8,6 +8,7 @@ import {
   setMoodModifierCallback,
   type MoodModifier,
 } from './ipc'
+import { getEffectiveAnchorY } from './window'
 
 type Mode =
   | 'idle'
@@ -34,6 +35,9 @@ const SAD_FRAMES = 120    // 4초
 const HAPPY_FRAMES = 90   // 3초
 const SLEEPING_FRAMES = 180 // 6초
 
+/** 1초마다 위치 안전 검증 (display 변경 누락·z-order 밀림 등 방어) */
+const SAFETY_CHECK_FRAMES = 30
+
 export function startMovementEngine(win: BrowserWindow): void {
   // 전체 모니터 결합 X 경계 계산
   function calcXBounds() {
@@ -44,24 +48,78 @@ export function startMovementEngine(win: BrowserWindow): void {
       if (wa.x < minX) minX = wa.x
       if (wa.x + wa.width > maxX) maxX = wa.x + wa.width
     }
+    // 디스플레이가 하나도 없으면(이론상) 안전한 디폴트
+    if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
+      return { minX: 0, maxX: WINDOW_WIDTH }
+    }
     return { minX, maxX }
   }
 
   let bounds = calcXBounds()
-  let currentWorkArea = screen.getPrimaryDisplay().workArea
-  let anchorY = currentWorkArea.y + currentWorkArea.height - WINDOW_HEIGHT
+  const initialDisplay = screen.getPrimaryDisplay()
+  let currentWorkArea = initialDisplay.workArea
+  let anchorY = getEffectiveAnchorY(initialDisplay)
 
   let x = currentWorkArea.x + currentWorkArea.width / 2 - WINDOW_WIDTH / 2
   let y = anchorY
   let vy = 0
 
+  /** 좌표 (cx, cy) 가 속한 디스플레이를 찾아 반환. screen API 가 실패해도 primary 로 fallback. */
+  function displayAt(cx: number, cy: number): Display {
+    try {
+      return screen.getDisplayNearestPoint({ x: Math.round(cx), y: Math.round(cy) })
+    } catch {
+      return screen.getPrimaryDisplay()
+    }
+  }
+
   /** 현재 윈도우 위치 기준으로 해당 모니터의 anchorY 재계산 (드래그 후 낙하용) */
   function recalcDisplay(): void {
     const pos = win.getPosition()
-    const display = screen.getDisplayNearestPoint({ x: pos[0] + WINDOW_WIDTH / 2, y: pos[1] })
+    const display = displayAt(pos[0] + WINDOW_WIDTH / 2, pos[1] + WINDOW_HEIGHT / 2)
     currentWorkArea = display.workArea
-    anchorY = currentWorkArea.y + currentWorkArea.height - WINDOW_HEIGHT
+    anchorY = getEffectiveAnchorY(display)
     bounds = calcXBounds()
+  }
+
+  /**
+   * 슬라임이 어떤 환경에서도 화면 밖이나 작업표시줄에 가려지지 않도록 강제 스냅.
+   * - 디스플레이 변경/슬립 복귀/주기 검증에서 호출됨.
+   * - 드래그 중에는 사용자가 위치를 잡고 있으므로 건드리지 않음.
+   */
+  function ensureOnScreen(): void {
+    if (mode === 'dragging') return
+
+    const cx = Math.round(x) + WINDOW_WIDTH / 2
+    const cy = Math.round(y) + WINDOW_HEIGHT / 2
+    const display = displayAt(cx, cy)
+    const wa = display.workArea
+    const safeAnchorY = getEffectiveAnchorY(display)
+
+    // X: 해당 모니터 workArea 안으로 (좌/우 작업표시줄 포함 안전)
+    const minX = wa.x
+    const maxX = wa.x + wa.width - WINDOW_WIDTH
+    if (x < minX) x = minX
+    if (x > maxX) x = maxX
+
+    // Y: anchorY 보다 아래로 떨어져 있으면 끌어올리고, workArea.y 위로도 너무 멀면 끌어내림
+    if (y > safeAnchorY) y = safeAnchorY
+    if (y < wa.y) y = wa.y
+
+    currentWorkArea = wa
+    anchorY = safeAnchorY
+    bounds = calcXBounds()
+
+    // 정지 모드들은 즉시 anchorY 로 스냅 (낙하 중이면 다음 tick 에서 자연 처리)
+    if (mode !== 'falling' && mode !== 'jumping') {
+      y = anchorY
+    }
+
+    if (!win.isDestroyed()) {
+      win.setPosition(Math.round(x), Math.round(y), false)
+      // z-order 가 다른 앱에 밀렸을 가능성 → 강제로 최상위로
+      win.moveTop()
+    }
   }
 
   let mode: Mode = 'idle'
@@ -187,13 +245,21 @@ export function startMovementEngine(win: BrowserWindow): void {
 
   /** 걷기 중 모니터 경계를 넘으면 해당 모니터의 anchorY로 갱신 */
   function updateAnchorForPosition(): void {
-    const display = screen.getDisplayNearestPoint({ x: Math.round(x) + WINDOW_WIDTH / 2, y: Math.round(y) })
-    const wa = display.workArea
-    anchorY = wa.y + wa.height - WINDOW_HEIGHT
+    const display = displayAt(Math.round(x) + WINDOW_WIDTH / 2, Math.round(y) + WINDOW_HEIGHT / 2)
+    anchorY = getEffectiveAnchorY(display)
   }
+
+  let safetyCounter = 0
 
   function tick(): void {
     if (win.isDestroyed()) return
+
+    // 1초마다 위치/디스플레이 안전 검증 (display 이벤트 누락·z-order 밀림 방어)
+    safetyCounter++
+    if (safetyCounter >= SAFETY_CHECK_FRAMES) {
+      safetyCounter = 0
+      ensureOnScreen()
+    }
 
     switch (mode) {
       case 'idle': {
@@ -330,5 +396,29 @@ export function startMovementEngine(win: BrowserWindow): void {
   })
 
   const timer = setInterval(tick, FRAME_INTERVAL)
-  win.on('closed', () => clearInterval(timer))
+
+  // ─── 디스플레이/전원 이벤트 ───
+  // 모니터 추가·제거·해상도 변경·DPI 변경 → bounds 재계산 + 안전 스냅
+  const onDisplayChange = (): void => {
+    bounds = calcXBounds()
+    ensureOnScreen()
+  }
+  screen.on('display-added', onDisplayChange)
+  screen.on('display-removed', onDisplayChange)
+  screen.on('display-metrics-changed', onDisplayChange)
+
+  // 슬립 → 복귀 후 좌표가 어긋나거나 z-order 가 밀린 경우 복구
+  const onResume = (): void => {
+    bounds = calcXBounds()
+    ensureOnScreen()
+  }
+  powerMonitor.on('resume', onResume)
+
+  win.on('closed', () => {
+    clearInterval(timer)
+    screen.removeListener('display-added', onDisplayChange)
+    screen.removeListener('display-removed', onDisplayChange)
+    screen.removeListener('display-metrics-changed', onDisplayChange)
+    powerMonitor.removeListener('resume', onResume)
+  })
 }
