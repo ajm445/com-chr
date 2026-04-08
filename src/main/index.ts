@@ -7,7 +7,7 @@ import { startMovementEngine } from './movement'
 import { initAutoUpdater } from './updater'
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.electron.com-chr')
+  electronApp.setAppUserModelId('com.ajm445.slime-pet')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

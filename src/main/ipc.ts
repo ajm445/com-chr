@@ -66,6 +66,9 @@ export function registerIPC(): void {
 
     // 메뉴가 열리는 동안 클릭 통과 해제 (투명 영역 클릭으로 메뉴 닫기 가능)
     win.setIgnoreMouseEvents(false)
+    // 외부 클릭으로 메뉴가 닫히도록 임시로 focusable 활성화
+    win.setFocusable(true)
+    win.focus()
 
     const menu = Menu.buildFromTemplate([
       { label: onCooldown ? '밥 주기 (대기중)' : '밥 주기', enabled: !onCooldown, click: () => {
@@ -89,8 +92,9 @@ export function registerIPC(): void {
     menu.popup({
       window: win,
       callback: () => {
-        // 메뉴 닫힌 후 클릭 통과 복원
+        // 메뉴 닫힌 후 클릭 통과 + 비포커스 상태 복원
         if (!win.isDestroyed()) {
+          win.setFocusable(false)
           win.setIgnoreMouseEvents(true, { forward: true })
         }
       },
