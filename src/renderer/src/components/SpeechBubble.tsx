@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { usePetStore } from '../store/petStore'
 
 // ---------------------------------------------------------------------------
@@ -398,105 +398,187 @@ export function pickLine(state: PetState): { text: string; tag: LineTag } {
 const SHOW_DURATION = 3000
 const MIN_INTERVAL = 8000
 const MAX_INTERVAL = 25000
+const FADE_IN_MS = 220
+const FADE_OUT_MS = 400
+
+// 스택 위치
+const BASE_BOTTOM = 70   // 아래 슬롯 (상호작용 우선)
+const STACKED_BOTTOM = 107 // 위 슬롯 (랜덤이 밀려 올라가는 자리)
+export const BUBBLE_STACK_GAP = STACKED_BOTTOM - BASE_BOTTOM // Pet.tsx 에서 상태바 위치 계산용
+
+type BubblePhase = 'in' | 'out'
+
+interface BubbleSlot {
+  text: string
+  phase: BubblePhase
+  /** 새 말풍선이 뜰 때마다 증가 — React 재마운트로 enter 애니메이션 재생 */
+  key: number
+}
 
 interface SpeechBubbleProps {
   hide?: boolean
-  onVisibleChange?: (visible: boolean) => void
+  /** 현재 화면에 떠 있는 말풍선 개수 (0 / 1 / 2) — 상태바 위치 계산용 */
+  onBubbleCountChange?: (count: number) => void
   interactionText?: string | null
   onInteractionDone?: () => void
 }
 
-export function SpeechBubble({ hide, onVisibleChange, interactionText, onInteractionDone }: SpeechBubbleProps) {
-  const [text, setText] = useState<string | null>(null)
-  const timerRef = useRef<number | null>(null)
-  const busyRef = useRef(false)
+export function SpeechBubble({ hide, onBubbleCountChange, interactionText, onInteractionDone }: SpeechBubbleProps) {
+  // 두 개의 독립된 슬롯: 랜덤 말풍선, 상호작용 말풍선
+  const [randomSlot, setRandomSlot] = useState<BubbleSlot | null>(null)
+  const [interactionSlot, setInteractionSlot] = useState<BubbleSlot | null>(null)
 
-  function clearTimers() {
-    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
-  }
+  const keySeqRef = useRef(0)
 
-  function scheduleNext() {
-    const state = usePetStore.getState()
-    const avg = (state.hunger + state.happiness + state.cleanliness) / 3
-    const interval = avg <= 20
-      ? MIN_INTERVAL * 0.5
-      : avg <= 50
-        ? MIN_INTERVAL
-        : MIN_INTERVAL + Math.random() * (MAX_INTERVAL - MIN_INTERVAL)
-    timerRef.current = window.setTimeout(showBubble, interval)
-  }
+  // 랜덤 말풍선 타이머
+  const randomShowTimerRef = useRef<number | null>(null)
+  const randomHideTimerRef = useRef<number | null>(null)
+  const randomUnmountTimerRef = useRef<number | null>(null)
 
-  function hideBubble() {
-    setText(null)
-    busyRef.current = false
-    onVisibleChange?.(false)
-    scheduleNext()
-  }
+  // 타이머 콜백 내부에서 최신 상태를 참조하기 위한 ref (stale closure 방지)
+  const randomBusyRef = useRef(false)
 
-  const showBubble = useCallback(() => {
-    // 이미 말풍선이 떠 있으면 건너뜀
-    if (busyRef.current) {
-      scheduleNext()
-      return
+  // 상호작용 말풍선 타이머
+  const interactionHideTimerRef = useRef<number | null>(null)
+  const interactionUnmountTimerRef = useRef<number | null>(null)
+
+  // 상태바 위치 계산을 위해 "표시 중(페이드아웃 포함)"인 말풍선 개수를 부모에 전달
+  useEffect(() => {
+    const count = (randomSlot ? 1 : 0) + (interactionSlot ? 1 : 0)
+    onBubbleCountChange?.(count)
+  }, [randomSlot, interactionSlot, onBubbleCountChange])
+
+  // ── 랜덤 말풍선: 단일 사이클로 묶어서 stale closure 회피 ──────
+  // 최초 1회 시작 + 자기 재귀 스케줄링
+  useEffect(() => {
+    function scheduleNextRandom() {
+      const state = usePetStore.getState()
+      const avg = (state.hunger + state.happiness + state.cleanliness) / 3
+      const interval = avg <= 20
+        ? MIN_INTERVAL * 0.5
+        : avg <= 50
+          ? MIN_INTERVAL
+          : MIN_INTERVAL + Math.random() * (MAX_INTERVAL - MIN_INTERVAL)
+      randomShowTimerRef.current = window.setTimeout(showRandomBubble, interval)
     }
 
-    const state = usePetStore.getState()
-    const { text: line, tag } = pickLine(state)
-    setText(line)
-    busyRef.current = true
-    onVisibleChange?.(true)
-
-    // 배고프거나 더럽거나 슬픈 대사 → 슬픈 표정
-    if (tag === 'hungry' || tag === 'dirty' || tag === 'sad') {
-      window.api.triggerInteraction('sad')
-    } else if (tag === 'sleep') {
-      window.api.triggerInteraction('sleeping')
+    function hideRandomBubble() {
+      setRandomSlot((s) => (s ? { ...s, phase: 'out' } : s))
+      if (randomUnmountTimerRef.current) clearTimeout(randomUnmountTimerRef.current)
+      randomUnmountTimerRef.current = window.setTimeout(() => {
+        setRandomSlot(null)
+        randomBusyRef.current = false
+        scheduleNextRandom()
+      }, FADE_OUT_MS)
     }
 
-    timerRef.current = window.setTimeout(hideBubble, SHOW_DURATION)
+    function showRandomBubble() {
+      // 이미 랜덤 말풍선이 떠 있으면 이번 턴 스킵
+      if (randomBusyRef.current) {
+        scheduleNextRandom()
+        return
+      }
+      const state = usePetStore.getState()
+      const { text: line, tag } = pickLine(state)
+      keySeqRef.current++
+      randomBusyRef.current = true
+      setRandomSlot({ text: line, phase: 'in', key: keySeqRef.current })
+
+      // 태그 기반 표정 트리거
+      if (tag === 'hungry' || tag === 'dirty' || tag === 'sad') {
+        window.api?.triggerInteraction('sad')
+      } else if (tag === 'sleep') {
+        window.api?.triggerInteraction('sleeping')
+      }
+
+      if (randomHideTimerRef.current) clearTimeout(randomHideTimerRef.current)
+      randomHideTimerRef.current = window.setTimeout(hideRandomBubble, SHOW_DURATION)
+    }
+
+    const initial = 3000 + Math.random() * 5000
+    randomShowTimerRef.current = window.setTimeout(showRandomBubble, initial)
+
+    return () => {
+      if (randomShowTimerRef.current) clearTimeout(randomShowTimerRef.current)
+      if (randomHideTimerRef.current) clearTimeout(randomHideTimerRef.current)
+      if (randomUnmountTimerRef.current) clearTimeout(randomUnmountTimerRef.current)
+    }
   }, [])
 
-  // 상호작용 말풍선 (우선)
+  // ── 상호작용 말풍선 ──────────────────────────────
+  // 부모가 매 렌더마다 새 onInteractionDone 을 넘겨도 useEffect 가 재실행되지 않도록 ref 에 보관
+  const onInteractionDoneRef = useRef(onInteractionDone)
+  useEffect(() => { onInteractionDoneRef.current = onInteractionDone }, [onInteractionDone])
+
   useEffect(() => {
     if (!interactionText) return
-    clearTimers()
-    setText(interactionText)
-    busyRef.current = true
-    onVisibleChange?.(true)
-    timerRef.current = window.setTimeout(() => {
-      onInteractionDone?.()
-      hideBubble()
+
+    // 이전 타이머 정리 (연속 상호작용 시 즉시 교체)
+    if (interactionHideTimerRef.current) clearTimeout(interactionHideTimerRef.current)
+    if (interactionUnmountTimerRef.current) clearTimeout(interactionUnmountTimerRef.current)
+
+    keySeqRef.current++
+    setInteractionSlot({ text: interactionText, phase: 'in', key: keySeqRef.current })
+
+    // 부모가 interactionText 를 null 로 되돌려서 동일 텍스트 연속 호출도 받을 수 있게 함
+    onInteractionDoneRef.current?.()
+
+    interactionHideTimerRef.current = window.setTimeout(() => {
+      setInteractionSlot((s) => (s ? { ...s, phase: 'out' } : s))
+      interactionUnmountTimerRef.current = window.setTimeout(() => {
+        setInteractionSlot(null)
+      }, FADE_OUT_MS)
     }, SHOW_DURATION)
   }, [interactionText])
 
-  // 최초 1회만 시작, 이후 자체 재귀
   useEffect(() => {
-    const initial = 3000 + Math.random() * 5000
-    timerRef.current = window.setTimeout(showBubble, initial)
-    return () => clearTimers()
-  }, [showBubble])
+    return () => {
+      if (interactionHideTimerRef.current) clearTimeout(interactionHideTimerRef.current)
+      if (interactionUnmountTimerRef.current) clearTimeout(interactionUnmountTimerRef.current)
+    }
+  }, [])
 
-  if (!text || hide) return null
+  if (hide) return null
+
+  // 상호작용이 존재하면 랜덤은 위로 밀린다. CSS transition 으로 부드럽게 슬라이드.
+  const randomBottom = interactionSlot ? STACKED_BOTTOM : BASE_BOTTOM
+  const interactionBottom = BASE_BOTTOM
 
   return (
-    <div style={{
-      position: 'absolute',
-      bottom: 70,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      background: 'rgba(10, 5, 30, 0.9)',
-      border: '1px solid rgba(120, 80, 255, 0.5)',
-      borderRadius: 8,
-      padding: '4px 8px',
-      fontSize: 11,
-      fontFamily: '"Pretendard", "맑은 고딕", monospace',
-      color: 'rgba(220, 200, 255, 0.95)',
-      whiteSpace: 'nowrap',
-      pointerEvents: 'none',
-      boxShadow: '0 0 8px rgba(100, 60, 255, 0.25)',
-      animation: 'bubble-in 0.2s ease-out',
-    }}>
-      {text}
+    <>
+      {randomSlot && <Bubble slot={randomSlot} bottom={randomBottom} />}
+      {interactionSlot && <Bubble slot={interactionSlot} bottom={interactionBottom} />}
+    </>
+  )
+}
+
+// 단일 말풍선 렌더러 — 페이즈에 따라 in/out 애니메이션, bottom 변화는 CSS transition
+function Bubble({ slot, bottom }: { slot: BubbleSlot; bottom: number }) {
+  return (
+    <div
+      key={slot.key}
+      style={{
+        position: 'absolute',
+        bottom,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: 'rgba(10, 5, 30, 0.9)',
+        border: '1px solid rgba(120, 80, 255, 0.5)',
+        borderRadius: 8,
+        padding: '4px 8px',
+        fontSize: 11,
+        fontFamily: '"Pretendard", "맑은 고딕", monospace',
+        color: 'rgba(220, 200, 255, 0.95)',
+        whiteSpace: 'nowrap',
+        pointerEvents: 'none',
+        boxShadow: '0 0 8px rgba(100, 60, 255, 0.25)',
+        animation: slot.phase === 'in'
+          ? `bubble-in ${FADE_IN_MS}ms ease-out`
+          : `bubble-out ${FADE_OUT_MS}ms ease-in forwards`,
+        transition: 'bottom 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
+      }}
+    >
+      {slot.text}
       <div style={{
         position: 'absolute',
         bottom: -6,
