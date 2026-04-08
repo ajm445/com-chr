@@ -59,4 +59,3 @@ export const DECAY_RATES = {
 } as const
 
 export const TICK_INTERVAL = 10_000 // 10초
-export const MAX_OFFLINE_TICKS = 8640 // 24시간 상한

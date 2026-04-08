@@ -4,7 +4,7 @@
  * 버그 우선순위: 레벨 공식 오류 → calcLevel 무한루프 → 상수 불합리성
  */
 
-import { expForLevel, DECAY_RATES, TICK_INTERVAL, MAX_OFFLINE_TICKS } from '@renderer/types/pet'
+import { expForLevel, DECAY_RATES, TICK_INTERVAL } from '@renderer/types/pet'
 
 // ─────────────────────────────────────────────
 // expForLevel 공식: 15 * N * (N+1)
@@ -109,15 +109,9 @@ describe('DECAY_RATES 합리성 검증', () => {
 })
 
 // ─────────────────────────────────────────────
-// MAX_OFFLINE_TICKS 합리성 검증
+// TICK_INTERVAL 합리성 검증
 // ─────────────────────────────────────────────
-describe('MAX_OFFLINE_TICKS 합리성 검증', () => {
-  it('MAX_OFFLINE_TICKS는 정확히 24시간에 해당한다', () => {
-    // 24시간 = 86400초 / 10초 = 8640 ticks
-    const expected = (24 * 60 * 60 * 1000) / TICK_INTERVAL
-    expect(MAX_OFFLINE_TICKS).toBe(expected)
-  })
-
+describe('TICK_INTERVAL 합리성 검증', () => {
   it('TICK_INTERVAL은 10초(10000ms)이다', () => {
     expect(TICK_INTERVAL).toBe(10_000)
   })
