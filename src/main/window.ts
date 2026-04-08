@@ -1,9 +1,9 @@
-import { BrowserWindow, screen } from 'electron'
+import { BrowserWindow, screen, ipcMain } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 
-export const WINDOW_WIDTH = 128
-export const WINDOW_HEIGHT = 256
+export const WINDOW_WIDTH = 160
+export const WINDOW_HEIGHT = 256 // 고정 높이: 스프라이트(64) + 점프/UI 공간(192)
 export const SPRITE_SIZE = 64
 
 export function createWindow(): BrowserWindow {
@@ -33,7 +33,16 @@ export function createWindow(): BrowserWindow {
 
   win.setAlwaysOnTop(true, 'screen-saver')
 
-  // 네이티브 컨텍스트 메뉴 차단 (커스텀 메뉴 사용)
+  // 투명 영역 클릭 통과
+  win.setIgnoreMouseEvents(true, { forward: true })
+
+  // 렌더러에서 스프라이트 hover → 인터랙티브 전환
+  ipcMain.on('pet:click-through', (_e, ignore: boolean) => {
+    if (!win.isDestroyed()) {
+      win.setIgnoreMouseEvents(ignore, ignore ? { forward: true } : undefined)
+    }
+  })
+
   win.webContents.on('context-menu', (e) => e.preventDefault())
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
