@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.9] — 2026-04-09
+
+### Fixed
+- 멀티 모니터 환경에서 슬라임이 모니터 경계를 넘어 반대쪽 모니터로 이동하지 못하던 문제 수정. 1.0.7 에 추가된 `ensureOnScreen` 1초 주기 안전 검증이 **현재 모니터의 workArea** 로 X 좌표를 clamp 해 버려, 매초 슬라임이 현재 모니터 안쪽으로 다시 밀려나 경계를 넘을 수 없었음. 이제 전체 모니터 결합 범위(`calcXBounds`)로 clamp.
+- 일부 Windows 환경에서 슬라임을 드래그 후 드롭했을 때 작업표시줄 아래로 빠져 보이던 문제 수정. 두 가지 방어를 추가:
+  1. `getEffectiveAnchorY()` 에 `WORKAREA_GAP=6px` 여유를 두어 스프라이트 바닥이 작업표시줄 윗선과 정확히 맞닿지 않도록 변경 (DPI 라운딩·z-order 경합 방어).
+  2. 드래그 종료(drop) 순간 `setAlwaysOnTop(true, 'screen-saver')` 재적용 + `moveTop()` 호출하여 드래그 중 밀렸던 z-order 를 즉시 복구.
+
 ## [1.0.8] — 2026-04-08
 
 ### Fixed

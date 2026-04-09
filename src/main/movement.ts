@@ -96,11 +96,12 @@ export function startMovementEngine(win: BrowserWindow): void {
     const wa = display.workArea
     const safeAnchorY = getEffectiveAnchorY(display)
 
-    // X: 해당 모니터 workArea 안으로 (좌/우 작업표시줄 포함 안전)
-    const minX = wa.x
-    const maxX = wa.x + wa.width - WINDOW_WIDTH
-    if (x < minX) x = minX
-    if (x > maxX) x = maxX
+    // X: 전체 모니터 결합 범위로 clamp.
+    // 단일 모니터의 workArea 로 clamp 하면 모니터 경계 근처에서 걷는 슬라임이
+    // 매 safety tick 마다 현재 모니터 안쪽으로 밀려 다른 모니터로 건너가지 못함.
+    const combined = calcXBounds()
+    if (x < combined.minX) x = combined.minX
+    if (x > combined.maxX - WINDOW_WIDTH) x = combined.maxX - WINDOW_WIDTH
 
     // Y: anchorY 보다 아래로 떨어져 있으면 끌어올리고, workArea.y 위로도 너무 멀면 끌어내림
     if (y > safeAnchorY) y = safeAnchorY
@@ -108,7 +109,7 @@ export function startMovementEngine(win: BrowserWindow): void {
 
     currentWorkArea = wa
     anchorY = safeAnchorY
-    bounds = calcXBounds()
+    bounds = combined
 
     // 정지 모드들은 즉시 anchorY 로 스냅 (낙하 중이면 다음 tick 에서 자연 처리)
     if (mode !== 'falling' && mode !== 'jumping') {
@@ -379,7 +380,17 @@ export function startMovementEngine(win: BrowserWindow): void {
 
   setDragStartCallback(() => enterDragging())
 
-  setDragEndCallback(() => { if (mode === 'dragging') enterFalling() })
+  setDragEndCallback(() => {
+    if (mode !== 'dragging') return
+    // 드래그 동안 Windows 작업표시줄에 z-order 가 밀렸을 수 있으므로
+    // 낙하 시작 직전에 강제로 최상위 복귀. always-on-top 도 재적용하여
+    // 일부 Windows 환경에서 screen-saver 레벨이 떨어지는 경우를 방어한다.
+    if (!win.isDestroyed()) {
+      win.setAlwaysOnTop(true, 'screen-saver')
+      win.moveTop()
+    }
+    enterFalling()
+  })
 
   setTriggerInteractionCallback((type) => {
     if (type === 'petting') enterPetting()
