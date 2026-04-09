@@ -14,20 +14,27 @@ export const SPRITE_SIZE = 64
 export const MIN_BOTTOM_SAFE_MARGIN = 48
 
 /**
+ * 작업표시줄이 workArea 에 정상 반영된 환경에서도 스프라이트 바닥과 작업표시줄 윗선
+ * 사이에 확보하는 최소 여유. 0px 이면 DPI 라운딩 / z-order 경합으로 스프라이트
+ * 하단 몇 px 이 작업표시줄에 덮여 "작업표시줄 아래로 떨어진 것처럼" 보일 수 있다.
+ */
+export const WORKAREA_GAP = 6
+
+/**
  * 디스플레이의 "유효 anchorY" — 슬라임의 윈도우 top 이 위치해야 하는 Y 좌표.
  *
  * 두 기준 중 더 **위쪽(=작은 y)** 을 선택한다:
- *   1. workArea 기준 바닥 (일반 작업표시줄이 정상 reservation 된 경우 이 값이 정답)
+ *   1. workArea 기준 바닥 − WORKAREA_GAP (정상 reservation 된 경우 이 값이 정답)
  *   2. display bounds 기준 바닥 − MIN_BOTTOM_SAFE_MARGIN (절대 안전선)
  *
  * 이렇게 하면:
- * - 정상 환경: workArea 기준 == 안전선 → 동일, 작업표시줄 바로 위에 안착
- * - 자동 숨김 작업표시줄 / 풀스크린 보호: workArea==bounds → 안전선이 더 위 → 56px 여유
+ * - 정상 환경: 작업표시줄 바로 위에 WORKAREA_GAP 만큼 띄워 안착 (z-order 경합 방어)
+ * - 자동 숨김 작업표시줄 / 풀스크린 보호: workArea==bounds → 안전선이 더 위 → 48px 여유
  * - 부분 reservation 버그(일부 Windows 11 설정): workArea 가 살짝만 줄어도 안전선이 더 위로 올라가 확실히 가려지지 않음
  */
 export function getEffectiveAnchorY(display: Display): number {
   const { workArea, bounds } = display
-  const workAreaAnchor = workArea.y + workArea.height - WINDOW_HEIGHT
+  const workAreaAnchor = workArea.y + workArea.height - WINDOW_HEIGHT - WORKAREA_GAP
   const safeAnchor = bounds.y + bounds.height - WINDOW_HEIGHT - MIN_BOTTOM_SAFE_MARGIN
   return Math.min(workAreaAnchor, safeAnchor)
 }
