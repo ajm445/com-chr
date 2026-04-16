@@ -3,6 +3,7 @@
   "version": "1.0.10",
   "description": "Digital pet desktop app - cybernetic slime on your taskbar",
   "license": "MIT",
+  "packageManager": "pnpm@10.26.2",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
